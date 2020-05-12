@@ -4,7 +4,7 @@ from __future__ import print_function
 
 from collections import OrderedDict
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tframe.core.function import Function
 from tframe import activations, initializers, checker, linker

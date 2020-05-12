@@ -6,7 +6,7 @@ import os
 import re
 import six
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 import tframe as tfr
 from . import console

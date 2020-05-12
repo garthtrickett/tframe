@@ -5,7 +5,7 @@ from __future__ import print_function
 import collections
 import sys
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tframe.data.base_classes import DataAgent
 

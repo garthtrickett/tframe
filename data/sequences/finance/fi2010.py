@@ -3,7 +3,8 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 
 import math
 import numpy as np
@@ -51,26 +52,27 @@ class FI2010(DataAgent):
     DATA_NAME = "FI-2010"
     DATA_URL = "https://etsin.fairdata.fi/api/dl?cr_id=73eb48d7-4dbc-4a10-a52a-da745b47a649&file_id=5b32ac028ab4d130110888f19872320"
     DAY_LENGTH = {
-        True: [47342, 45114, 33720, 43252, 41171, 47253, 45099, 59973, 57951, 37250],
-        False: [39512, 38397, 28535, 37023, 34785, 39152, 37346, 55478, 52172, 31937],
+        True:
+        [47342, 45114, 33720, 43252, 41171, 47253, 45099, 59973, 57951, 37250],
+        False:
+        [39512, 38397, 28535, 37023, 34785, 39152, 37346, 55478, 52172, 31937],
     }
     STOCK_IDs = ["KESBV", "OUT1V", "SAMPO", "RTRKS", "WRT1V"]
     LEN_PER_DAY_PER_STOCK = "LEN_PER_DAY_PER_STOCK"
 
     @classmethod
-    def load(
-        cls,
-        data_dir,
-        auction=False,
-        norm_type="zscore",
-        setup=2,
-        val_size=None,
-        horizon=100,
-        **kwargs
-    ):
-        should_apply_norm = any(
-            ["use_log" not in th.developer_code, "force_norm" in th.developer_code]
-        )
+    def load(cls,
+             data_dir,
+             auction=False,
+             norm_type="zscore",
+             setup=2,
+             val_size=None,
+             horizon=100,
+             **kwargs):
+        should_apply_norm = any([
+            "use_log" not in th.developer_code,
+            "force_norm" in th.developer_code
+        ])
         # Sanity check
         assert setup in [1, 2]
         # Load raw LOB data
@@ -82,12 +84,15 @@ class FI2010(DataAgent):
 
         home = str(Path.home())
 
-        file_name = "model_name=two_model&WL=15&pt=1&sl=1&min_ret=0.0021&vbs=240&head=0&skip=0&fraction=1&vol_max=0.0022&vol_min=0.00210001&filter_type=none&cm_vol_mod=0&sample_weights=on&frac_diff=off&prices_type=orderbook&ntb=True&tslbc=True.h5"
+        file_name = "2ml27cbo_gam_rhn.h5"
         path = home + "/ProdigyAI/data/preprocessed/" + file_name
         h5f = h5py.File(path, "r")
         X = h5f["X"][:]
         y = h5f["y"][:]
         h5f.close()
+
+        import pdb
+        pdb.set_trace()
 
         X_zeros = np.zeros((X.shape))
         X = np.concatenate((X, X_zeros), axis=1)
@@ -99,7 +104,7 @@ class FI2010(DataAgent):
         lob_set.data_dict["raw_data"] = [X]
 
         def round_down(n, decimals=0):
-            multiplier = 10 ** decimals
+            multiplier = 10**decimals
             return math.floor(n * multiplier) / multiplier
 
         number = round_down(len(y) / 10)
@@ -118,33 +123,34 @@ class FI2010(DataAgent):
 
         if should_apply_norm:
             train_set, test_set = cls._apply_normalization(
-                train_set, test_set, norm_type
-            )
-        if kwargs.get("validate_setup2") and setup == 2 and norm_type == "zscore":
+                train_set, test_set, norm_type)
+        if kwargs.get(
+                "validate_setup2") and setup == 2 and norm_type == "zscore":
             cls._validate_setup2(data_dir, auction, train_set)
 
         return train_set, test_set
 
     @classmethod
     def extract_seq_set(cls, raw_set, horizon):
-        assert isinstance(raw_set, SequenceSet) and horizon in [10, 20, 30, 50, 100]
+        assert isinstance(raw_set,
+                          SequenceSet) and horizon in [10, 20, 30, 50, 100]
         seq_set = SequenceSet(
-            features=[array[:, :40] for array in raw_set.data_dict["raw_data"]],
+            features=[
+                array[:, :40] for array in raw_set.data_dict["raw_data"]
+            ],
             targets=raw_set.data_dict[horizon],
             name=raw_set.name,
         )
         return seq_set
 
     @classmethod
-    def load_as_tframe_data(
-        cls,
-        data_dir,
-        auction=False,
-        norm_type="zscore",
-        setup=None,
-        file_slices=None,
-        **kwargs
-    ):
+    def load_as_tframe_data(cls,
+                            data_dir,
+                            auction=False,
+                            norm_type="zscore",
+                            setup=None,
+                            file_slices=None,
+                            **kwargs):
         # Confirm type of normalization
         nt_lower = norm_type.lower()
         # 'Zscore' for directory names and 'ZScore' for file names
@@ -155,19 +161,21 @@ class FI2010(DataAgent):
         elif nt_lower in ["3", "decpre"]:
             type_id, norm_type = 3, "DecPre"
         else:
-            raise KeyError("Unknown type of normalization `{}`".format(norm_type))
+            raise KeyError(
+                "Unknown type of normalization `{}`".format(norm_type))
         # Load directly if dataset exists
         data_path = cls._get_data_path(data_dir, auction, norm_type, setup)
         if os.path.exists(data_path):
             return SequenceSet.load(data_path)
         # If dataset does not exist, create from raw data
-        console.show_status(
-            "Creating `{}` from raw data ...".format(os.path.basename(data_path))
-        )
+        console.show_status("Creating `{}` from raw data ...".format(
+            os.path.basename(data_path)))
         # Load raw data
-        features, targets = cls._load_raw_data(
-            data_dir, auction, norm_type, type_id, file_slices=file_slices
-        )
+        features, targets = cls._load_raw_data(data_dir,
+                                               auction,
+                                               norm_type,
+                                               type_id,
+                                               file_slices=file_slices)
 
         # Wrap raw data into tframe Sequence set
         data_dict = {"raw_data": features}
@@ -190,8 +198,7 @@ class FI2010(DataAgent):
         len_per_day_per_stock = lob_set[cls.LEN_PER_DAY_PER_STOCK]
         assert len(len_per_day_per_stock) == lob_set.size
         for stock, (k, lob, move) in enumerate(
-            zip(k_list, lob_set.features, lob_set.targets)
-        ):
+                zip(k_list, lob_set.features, lob_set.targets)):
             lengths = len_per_day_per_stock[stock]
             L = sum(lengths[:k])
             if k != 0:
@@ -202,26 +209,27 @@ class FI2010(DataAgent):
                 second_targets.append(move[L:])
         # Wrap data sets and return
         first_properties = {
-            cls.LEN_PER_DAY_PER_STOCK: [
-                s[:k] for k, s in zip(k_list, len_per_day_per_stock) if k != 0
-            ]
+            cls.LEN_PER_DAY_PER_STOCK:
+            [s[:k] for k, s in zip(k_list, len_per_day_per_stock) if k != 0]
         }
-        first_set = SequenceSet(
-            first_features, first_targets, name=first_name, **first_properties
-        )
+        first_set = SequenceSet(first_features,
+                                first_targets,
+                                name=first_name,
+                                **first_properties)
         second_properties = {
             cls.LEN_PER_DAY_PER_STOCK: [
-                s[k:] for k, s in zip(k_list, len_per_day_per_stock) if k != len(s)
+                s[k:] for k, s in zip(k_list, len_per_day_per_stock)
+                if k != len(s)
             ]
         }
-        second_set = SequenceSet(
-            second_features, second_targets, name=second_name, **second_properties
-        )
+        second_set = SequenceSet(second_features,
+                                 second_targets,
+                                 name=second_name,
+                                 **second_properties)
 
         for seq_set in [first_set, second_set]:
             assert np.sum(seq_set.structure) == np.sum(
-                np.concatenate(seq_set[cls.LEN_PER_DAY_PER_STOCK])
-            )
+                np.concatenate(seq_set[cls.LEN_PER_DAY_PER_STOCK]))
 
         return first_set, second_set
 
@@ -267,7 +275,9 @@ class FI2010(DataAgent):
         for j, lobs in enumerate(lob_list):
             # Find cliff indices
             max_delta = 300 if auction else 200
-            indices = cls._get_cliff_indices(lobs, auction, max_delta=max_delta)
+            indices = cls._get_cliff_indices(lobs,
+                                             auction,
+                                             max_delta=max_delta)
             # Fill LOBs
             from_i = 0
             for stock in range(5):
@@ -285,15 +295,13 @@ class FI2010(DataAgent):
         }
         data_dict["raw_data"] = [np.concatenate(lb_list) for lb_list in LOBs]
         # Initiate a new seq_set
-        seq_set = SequenceSet(
-            data_dict=data_dict,
-            name="FI-2010-LOBs",
-            **{
-                cls.LEN_PER_DAY_PER_STOCK: cls._get_len_per_day_per_stock(
-                    data_dir, auction
-                )
-            }
-        )
+        seq_set = SequenceSet(data_dict=data_dict,
+                              name="FI-2010-LOBs",
+                              **{
+                                  cls.LEN_PER_DAY_PER_STOCK:
+                                  cls._get_len_per_day_per_stock(
+                                      data_dir, auction)
+                              })
         # Sanity check (394337)
         assert sum(seq_set.structure) == sum(cls.DAY_LENGTH[auction])
         # Save and return
@@ -330,7 +338,7 @@ class FI2010(DataAgent):
         # Initialize features
         features = lob_set.data_dict["raw_data"]
         # .. max_level
-        features = [array[:, : 4 * max_level] for array in features]
+        features = [array[:, :4 * max_level] for array in features]
         # .. check developer code
         if "use_log" in th.developer_code:
             for x in features:
@@ -339,7 +347,8 @@ class FI2010(DataAgent):
         # .. volume only
         if th.volume_only:
             # features = [array[:, 1::2] for array in features] # For original Data
-            features = [array[:, 0:20] for array in features]  # For crypto data
+            features = [array[:, 0:20]
+                        for array in features]  # For crypto data
         # Set features back
         lob_set.features = features
         # Initialize targets
@@ -373,9 +382,9 @@ class FI2010(DataAgent):
         indices = np.where(delta > max_delta)[0] + shift - 1
         if auction:
             indices = [
-                i
-                for i in indices
-                if np.abs(p[min(i + 100, len(p) - 1)] - p[i - 100]) > max_delta
+                i for i in indices
+                if np.abs(p[min(i + 100,
+                                len(p) - 1)] - p[i - 100]) > max_delta
             ]
         if len(indices) != 4:
             raise AssertionError
@@ -397,14 +406,20 @@ class FI2010(DataAgent):
             max_delta = 0.4 if auction else 0.1
             indices = cls._get_cliff_indices(lobs, auction, max_delta)
             indices = [-1] + indices + [len(lobs) - 1]
-            for i, L in enumerate([indices[j + 1] - indices[j] for j in range(5)]):
+            for i, L in enumerate(
+                [indices[j + 1] - indices[j] for j in range(5)]):
                 lengths[i].append(L)
         # Sanity check
         assert np.sum(lengths) == sum(cls.DAY_LENGTH[auction])
         return lengths
 
     @classmethod
-    def _load_raw_data(cls, data_dir, auction, norm_type, type_id, file_slices=None):
+    def _load_raw_data(cls,
+                       data_dir,
+                       auction,
+                       norm_type,
+                       type_id,
+                       file_slices=None):
         assert isinstance(auction, bool)
         if not isinstance(norm_type, str):
             norm_type = str(norm_type)
@@ -414,37 +429,34 @@ class FI2010(DataAgent):
             auction_dir_name = "No" + auction_dir_name
         # Get directory name for training and test set
         norm_dir_name = "{}.{}_{}".format(type_id, auction_dir_name, norm_type)
-        path = os.path.join(
-            data_dir, "BenchmarkDatasets", auction_dir_name, norm_dir_name
-        )
+        path = os.path.join(data_dir, "BenchmarkDatasets", auction_dir_name,
+                            norm_dir_name)
         training_set_path = os.path.join(
-            path, "{}_{}_Training".format(auction_dir_name, norm_type)
-        )
+            path, "{}_{}_Training".format(auction_dir_name, norm_type))
         test_set_path = os.path.join(
-            path, "{}_{}_Testing".format(auction_dir_name, norm_type)
-        )
+            path, "{}_{}_Testing".format(auction_dir_name, norm_type))
 
         # Check training and test path
-        if any(
-            [not os.path.exists(training_set_path), not os.path.exists(test_set_path)]
-        ):
+        if any([
+                not os.path.exists(training_set_path),
+                not os.path.exists(test_set_path)
+        ]):
             import zipfile
 
             zip_file_name = "BenchmarkDatasets.zip"
             zip_file_path = cls._check_raw_data(data_dir, zip_file_name)
             console.show_status(
                 "Extracting {} (this may need several minutes) ...".format(
-                    zip_file_name
-                )
-            )
+                    zip_file_name))
             zipfile.ZipFile(zip_file_path, "r").extractall(data_dir)
             console.show_status("{} extracted successfully.".format(data_dir))
-        assert all([os.path.exists(training_set_path), os.path.exists(test_set_path)])
+        assert all(
+            [os.path.exists(training_set_path),
+             os.path.exists(test_set_path)])
 
         # Read data and return
-        return cls._read_train_test(
-            training_set_path, test_set_path, auction, norm_type, file_slices
-        )
+        return cls._read_train_test(training_set_path, test_set_path, auction,
+                                    norm_type, file_slices)
 
     @classmethod
     def _get_data_file_path_list(cls, dir_name, training, auction, norm_type):
@@ -454,8 +466,8 @@ class FI2010(DataAgent):
         prefix = "Train" if training else "Test"
         file_path_list = [
             os.path.join(
-                dir_name, "{}_Dst_{}_{}_CF_{}.txt".format(prefix, auction, norm_type, i)
-            )
+                dir_name,
+                "{}_Dst_{}_{}_CF_{}.txt".format(prefix, auction, norm_type, i))
             for i in range(1, 10)
         ]
         # Make sure each file exists
@@ -465,13 +477,18 @@ class FI2010(DataAgent):
         return file_path_list
 
     @classmethod
-    def _read_train_test(
-        cls, train_dir, test_dir, auction, norm_type, file_slices=None
-    ):
+    def _read_train_test(cls,
+                         train_dir,
+                         test_dir,
+                         auction,
+                         norm_type,
+                         file_slices=None):
         """This method is better used for reading DecPre data for further restoring
     """
-        train_paths = cls._get_data_file_path_list(train_dir, True, auction, norm_type)
-        test_paths = cls._get_data_file_path_list(test_dir, False, auction, norm_type)
+        train_paths = cls._get_data_file_path_list(train_dir, True, auction,
+                                                   norm_type)
+        test_paths = cls._get_data_file_path_list(test_dir, False, auction,
+                                                  norm_type)
         # Read data from .txt files
         features, targets = [], {}
         horizons = [10, 20, 30, 50, 100]
@@ -490,9 +507,8 @@ class FI2010(DataAgent):
             features.append([])
             for h in horizons:
                 targets[h].append([])
-            console.show_status(
-                "Reading data from `{}` ...".format(os.path.basename(path))
-            )
+            console.show_status("Reading data from `{}` ...".format(
+                os.path.basename(path)))
             with open(path, "r") as f:
                 lines = f.readlines()
             # Sanity check
@@ -513,10 +529,10 @@ class FI2010(DataAgent):
             # Stack list
             features[-1] = np.stack(features[-1], axis=0)
             for k, h in enumerate(horizons):
-                targets[h][-1] = (
-                    np.array(np.stack(targets[h][-1], axis=0), dtype=np.int64) - 1
-                )
-            console.show_status("Successfully read {} event blocks".format(total))
+                targets[h][-1] = (np.array(np.stack(targets[h][-1], axis=0),
+                                           dtype=np.int64) - 1)
+            console.show_status(
+                "Successfully read {} event blocks".format(total))
         # Sanity check and return
         total = sum([len(x) for x in features])
         console.show_status("Totally {} event blocks read.".format(total))
@@ -545,7 +561,8 @@ class FI2010(DataAgent):
             lob_targets = np.concatenate(data_dict[h])
             zs_targets = np.concatenate(zscore_set.data_dict[h])
             if not np.equal(lob_targets, zs_targets).all():
-                raise AssertionError("Targets not equal when horizon = {}".format(h))
+                raise AssertionError(
+                    "Targets not equal when horizon = {}".format(h))
         console.show_info("Targets are all correct.")
 
     @classmethod
@@ -570,8 +587,8 @@ class FI2010(DataAgent):
         )
         assert isinstance(zscore_set, SequenceSet)
         zs_all = np.concatenate(
-            [array[:, :40] for array in zscore_set.data_dict["raw_data"]], axis=0
-        )
+            [array[:, :40] for array in zscore_set.data_dict["raw_data"]],
+            axis=0)
         # Load min-max data
         mm_set = cls.load_as_tframe_data(
             data_dir,
@@ -581,8 +598,7 @@ class FI2010(DataAgent):
             file_slices=(slice(8, 9), slice(8, 9)),
         )
         mm_all = np.concatenate(
-            [array[:, :40] for array in mm_set.data_dict["raw_data"]], axis=0
-        )
+            [array[:, :40] for array in mm_set.data_dict["raw_data"]], axis=0)
         # Generate lob -> zscore data for validation
         lob_all = np.concatenate(lob_list, axis=0)
         lob_zs_all = (lob_all - mu) / sigma
@@ -608,9 +624,7 @@ class FI2010(DataAgent):
             if zs_mm_err > 0.1:
                 raise AssertionError(
                     "In LOB[{}, {}] val_zs = {} while val_mm = {}".format(
-                        i, j, val_zs, val_mm
-                    )
-                )
+                        i, j, val_zs, val_mm))
             correct_val = val_mm
             if not P_errs:
                 correct_val = np.round(val_mm)
@@ -618,18 +632,14 @@ class FI2010(DataAgent):
                 if cor_mm_err > 1e-3:
                     raise AssertionError(
                         "In LOB[{}, {}] cor_val = {} while val_mm = {}".format(
-                            i, j, cor_mm_err, val_mm
-                        )
-                    )
+                            i, j, cor_mm_err, val_mm))
             # Correct value in lob_all
             lob_all[i, j] = correct_val
             bar.show(i)
         # Show status after correction
         console.show_status(
             "{} price errors and {} volume errors have been corrected".format(
-                P_errs, V_errs
-            )
-        )
+                P_errs, V_errs))
         new_lob_list = []
         for s in [len(array) for array in lob_list]:
             day_block, lob_all = np.split(lob_all, [s])
@@ -642,11 +652,11 @@ class FI2010(DataAgent):
     def _get_data_path(cls, data_dir, auction, norm_type=None, setup=None):
         assert isinstance(auction, bool)
         if all([norm_type is None, setup is None]):
-            file_name = "FI-2010-{}Auction-LOBs.tfds".format("" if auction else "No")
+            file_name = "FI-2010-{}Auction-LOBs.tfds".format(
+                "" if auction else "No")
         else:
             file_name = "FI-2010-{}Auction-{}-Setup{}.tfds".format(
-                "" if auction else "No", norm_type, setup
-            )
+                "" if auction else "No", norm_type, setup)
         return os.path.join(data_dir, file_name)
 
     # endregion : Private Methods
@@ -662,7 +672,8 @@ class FI2010(DataAgent):
     # region : RNN batch generator for Sequence Set
 
     @staticmethod
-    def rnn_batch_generator(data_set, batch_size, num_steps, is_training, round_len):
+    def rnn_batch_generator(data_set, batch_size, num_steps, is_training,
+                            round_len):
         """Generated epoch batches are guaranteed to cover all sequences"""
         assert isinstance(data_set, SequenceSet) and is_training
         L = int(sum(data_set.structure) / batch_size)
@@ -673,22 +684,25 @@ class FI2010(DataAgent):
         num_sequences = wise_man.apportion(data_set.structure, batch_size)
         # Generate feature list and target list
         features, targets = [], []
-        for num, x, y in zip(num_sequences, data_set.features, data_set.targets):
+        for num, x, y in zip(num_sequences, data_set.features,
+                             data_set.targets):
             # Find starts for each sequence to sample
             starts = wise_man.spread(len(x), num, L, rad)
             # Sanity check
             assert len(starts) == num
             # Put the sub-sequences into corresponding lists
             for s in starts:
-                features.append(x[s : s + L])
-                targets.append(y[s : s + L])
+                features.append(x[s:s + L])
+                targets.append(y[s:s + L])
         # Stack features and targets
         features, targets = np.stack(features), np.stack(targets)
         data_set = DataSet(features, targets, is_rnn_input=True)
         assert data_set.size == batch_size
         # Generate RNN batches using DataSet.gen_rnn_batches
         counter = 0
-        for batch in data_set.gen_rnn_batches(batch_size, num_steps, is_training=True):
+        for batch in data_set.gen_rnn_batches(batch_size,
+                                              num_steps,
+                                              is_training=True):
             yield batch
             counter += 1
 
@@ -696,8 +710,7 @@ class FI2010(DataAgent):
         if counter != round_len:
             raise AssertionError(
                 "!! counter = {} while round_len = {}. (batch_size = {}, num_steps={})"
-                "".format(counter, round_len, batch_size, num_steps)
-            )
+                "".format(counter, round_len, batch_size, num_steps))
 
     # endregion : RNN batch generator for Sequence Set
 
@@ -708,7 +721,8 @@ class FI2010(DataAgent):
         from tframe.trainers.trainer import Trainer
 
         # Sanity check
-        assert isinstance(trainer, Trainer) and isinstance(dataset, SequenceSet)
+        assert isinstance(trainer, Trainer) and isinstance(
+            dataset, SequenceSet)
         model = trainer.model
         assert isinstance(model, Classifier)
 
@@ -724,11 +738,9 @@ class FI2010(DataAgent):
         label_pred = np.concatenate(label_pred)
         table, F1 = FI2010._get_table_and_F1(label_pred, title="All Stocks, ")
 
-        content = "F1 Scores: {}".format(
-            ", ".join(
-                ["[{}] {:.2f}".format(i + 1, score) for i, score in enumerate(F1s)]
-            )
-        )
+        content = "F1 Scores: {}".format(", ".join([
+            "[{}] {:.2f}".format(i + 1, score) for i, score in enumerate(F1s)
+        ]))
         return content + table.content
 
     @staticmethod
@@ -739,22 +751,22 @@ class FI2010(DataAgent):
         else:
             model = entity
         # Sanity check
-        assert isinstance(model, Classifier) and isinstance(seq_set, SequenceSet)
+        assert isinstance(model, Classifier) and isinstance(
+            seq_set, SequenceSet)
         # Get table and F1 score for each stock
         label_pred = FI2010._get_label_pred(model, seq_set)
         ### PRODIGY AI HOKUS POKUS START
         label_pred[0] = label_pred[0].reshape((len(label_pred[0]), 1))
         label_pred[0] = np.round(label_pred[0])
-        seq_set.data_dict["targets"][0] = seq_set.data_dict["targets"][0].reshape(
-            (len(seq_set.data_dict["targets"][0]), 1)
-        )
+        seq_set.data_dict["targets"][0] = seq_set.data_dict["targets"][
+            0].reshape((len(seq_set.data_dict["targets"][0]), 1))
         label_pred[0] = np.concatenate(
-            (label_pred[0], seq_set.data_dict["targets"][0]), axis=1
-        )
+            (label_pred[0], seq_set.data_dict["targets"][0]), axis=1)
         ### PRODIGY AI HOKUS POKUS END
 
         for i, lp in enumerate(label_pred):
-            table, _ = FI2010._get_table_and_F1(lp, title="[{}] ".format(i + 1))
+            table, _ = FI2010._get_table_and_F1(lp,
+                                                title="[{}] ".format(i + 1))
             table.print_buffer()
             if is_training:
                 model.agent.take_notes(table.content)
@@ -787,9 +799,10 @@ class FI2010(DataAgent):
         assert isinstance(model, Classifier)
         # Get predictions and labels
         label_pred_tensor = model.key_metric.quantity_definition.quantities
-        label_pred = model.evaluate(
-            label_pred_tensor, dataset, batch_size=batch_size, verbose=True
-        )
+        label_pred = model.evaluate(label_pred_tensor,
+                                    dataset,
+                                    batch_size=batch_size,
+                                    verbose=True)
         console.show_status("Evaluation completed")
         table, F1 = cls._get_table_and_F1(label_pred)
         return table, F1
@@ -800,7 +813,9 @@ class FI2010(DataAgent):
         # assert isinstance(label_pred, np.ndarray) and label_pred.shape[-1] == 2
         # Initialize table
         movements = ["Upward", "Stationary", "Downward"]
-        header = ["Movement  ", "Accuracy %", "Precision %", "Recall %", "   F1 %"]
+        header = [
+            "Movement  ", "Accuracy %", "Precision %", "Recall %", "   F1 %"
+        ]
         widths = [len(h) for h in header]
         table = Table(*widths, tab=3, margin=1, buffered=True)
         table.specify_format(*["{:.2f}" for _ in header], align="lrrrr")
@@ -811,7 +826,8 @@ class FI2010(DataAgent):
         precisions, recalls, F1s = [], [], []
         x = label_pred
         for c_thingo, move in enumerate(movements):
-            col, row = x[x[:, 0] == c_thingo][:, 1], x[x[:, 1] == c_thingo][:, 0]
+            col, row = x[x[:, 0] == c_thingo][:, 1], x[x[:, 1] == c_thingo][:,
+                                                                            0]
             TP = len(col[col == c_thingo])
             FP, FN = len(row) - TP, len(col) - TP
             precision = TP / (TP + FP) * 100 if TP + FP > 0 else 0
@@ -842,8 +858,10 @@ class FI2010(DataAgent):
     def _read_10_days_dep(cls, train_dir, test_dir, auction, norm_type, setup):
         """Read train_1, test_1, ... test_9 in order."""
         assert setup == 2
-        train_paths = cls._get_data_file_path_list(train_dir, True, auction, norm_type)
-        test_paths = cls._get_data_file_path_list(test_dir, False, auction, norm_type)
+        train_paths = cls._get_data_file_path_list(train_dir, True, auction,
+                                                   norm_type)
+        test_paths = cls._get_data_file_path_list(test_dir, False, auction,
+                                                  norm_type)
         # Read data from .txt files
         features, targets = [], {}
         horizons = [10, 20, 30, 50, 100]
@@ -857,9 +875,8 @@ class FI2010(DataAgent):
             features.append([])
             for h in horizons:
                 targets[h].append([])
-            console.show_status(
-                "Reading data from `{}` ...".format(os.path.basename(path))
-            )
+            console.show_status("Reading data from `{}` ...".format(
+                os.path.basename(path)))
             with open(path, "r") as f:
                 lines = f.readlines()
             # Sanity check
@@ -880,10 +897,10 @@ class FI2010(DataAgent):
             # Stack list
             features[-1] = np.stack(features[-1], axis=0)
             for k, h in enumerate(horizons):
-                targets[h][-1] = (
-                    np.array(np.stack(targets[h][-1], axis=0), dtype=np.int64) - 1
-                )
-            console.show_status("Successfully read {} event blocks".format(total))
+                targets[h][-1] = (np.array(np.stack(targets[h][-1], axis=0),
+                                           dtype=np.int64) - 1)
+            console.show_status(
+                "Successfully read {} event blocks".format(total))
         # Sanity check and return
         total = sum([len(x) for x in features])
         console.show_status("Totally {} event blocks read.".format(total))

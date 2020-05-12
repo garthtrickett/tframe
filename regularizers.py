@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import six
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tframe.utils.arg_parser import Parser
 

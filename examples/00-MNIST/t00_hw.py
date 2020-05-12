@@ -1,6 +1,6 @@
 import mn_core as core
 import mn_mu as m
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tframe import console
 from tframe.utils.misc import date_string
 from tframe.layers.advanced import Dense

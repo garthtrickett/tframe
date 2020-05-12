@@ -8,7 +8,7 @@ import time
 import os
 
 from sys import stdout
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tframe.utils import misc
 

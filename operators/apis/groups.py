@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import re
 import inspect
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tframe import linker
 
