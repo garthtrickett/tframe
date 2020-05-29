@@ -84,15 +84,12 @@ class FI2010(DataAgent):
 
         home = str(Path.home())
 
-        file_name = "2ml27cbo_gam_rhn.h5"
+        file_name = "ln25mjx4_gam_rhn.h5"
         path = home + "/ProdigyAI/data/preprocessed/" + file_name
         h5f = h5py.File(path, "r")
         X = h5f["X"][:]
         y = h5f["y"][:]
         h5f.close()
-
-        import pdb
-        pdb.set_trace()
 
         X_zeros = np.zeros((X.shape))
         X = np.concatenate((X, X_zeros), axis=1)
